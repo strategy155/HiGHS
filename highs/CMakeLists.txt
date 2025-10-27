@@ -397,6 +397,8 @@ else()
   message(STATUS "No CSharp support")
 endif()
 
+
+
 find_package(Threads)
 if(Threads_FOUND)
   include(CheckAtomic)
@@ -414,3 +416,17 @@ if(FAST_BUILD)
 else()
   target_link_libraries(libhighs Threads::Threads)
 endif()
+
+
+set(MKL_THREADING gnu_thread)
+
+
+find_package(MKL CONFIG REQUIRED PATHS $ENV{MKLROOT})
+
+if(FAST_BUILD)
+    target_link_libraries(highs MKL::MKL)
+else()
+    target_link_libraries(libhighs MKL::MKL)
+endif()
+
+
