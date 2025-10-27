@@ -44,6 +44,9 @@ void Solver::solve() {
     return;
   }
 
+  // iterate object needs to be initialised before potentially interrupting
+  it_.reset(new Iterate(model_, regul_));
+
   if (checkInterrupt()) return;
 
   printInfo();
@@ -72,9 +75,6 @@ bool Solver::initialise() {
   // Return true if an error occurred.
 
   start_time_ = control_.elapsed();
-
-  // initialise iterate object
-  it_.reset(new Iterate(model_, regul_));
 
   // initialise linear solver
   LS_.reset(new FactorHiGHSSolver(options_, model_, regul_, &info_, &it_->data,
@@ -395,7 +395,7 @@ double Solver::stepToBoundary(const std::vector<double>& x,
   // Use lo=1 for xl and zl, lo=0 for xu and zu.
   // Return the blocking index in block.
 
-  const double damp = 1.0 - std::numeric_limits<double>::epsilon();
+  const double damp = 1.0 - 100.0 * std::numeric_limits<double>::epsilon();
 
   double alpha = 1.0;
   Int bl = -1;
@@ -997,18 +997,27 @@ bool Solver::checkBadIter() {
   // check for infeasibility
   bool mu_is_large =
       it_->best_mu > 0.0 ? it_->mu > it_->best_mu * kDivergeTol : false;
-  bool pobj_is_large =
-      it_->pobj < -std::max(std::abs(it_->dobj) * kDivergeTol, 1.0);
-  bool dobj_is_large =
-      it_->dobj > std::max(std::abs(it_->pobj) * kDivergeTol, 1.0);
+  bool pobj_is_very_large =
+      it_->pobj <
+      -std::max(std::abs(it_->dobj) * kDivergeTol * kDivergeTol, 1.0);
+  bool dobj_is_very_large =
+      it_->dobj >
+      std::max(std::abs(it_->pobj) * kDivergeTol * kDivergeTol, 1.0);
+  bool clearly_infeasible =
+      iter_ > 5 && (pobj_is_very_large || dobj_is_very_large);
 
-  if (too_many_bad_iter || mu_is_large) {
-    if (pobj_is_large) {
+  if (too_many_bad_iter || mu_is_large || clearly_infeasible) {
+    bool pobj_is_larger =
+        it_->pobj < -std::max(std::abs(it_->dobj) * kDivergeTol, 1.0);
+    bool dobj_is_larger =
+        it_->dobj > std::max(std::abs(it_->pobj) * kDivergeTol, 1.0);
+
+    if (pobj_is_larger) {
       // problem is likely to be primal unbounded, i.e. dual infeasible
       logH_.print("=== Dual infeasible\n");
       info_.status = kStatusDualInfeasible;
       terminate = true;
-    } else if (dobj_is_large) {
+    } else if (dobj_is_larger) {
       // problem is likely to be dual unbounded, i.e. primal infeasible
       logH_.print("=== Primal infeasible\n");
       info_.status = kStatusPrimalInfeasible;
@@ -1412,11 +1421,21 @@ void Solver::printOutput() const {
 void Solver::printInfo() const {
   std::stringstream log_stream;
   log_stream << "\nRunning HiPO\n";
+
+  // Print blas path
+#ifdef BLAS_LIBRARIES
+  log_stream << textline("BLAS:") << BLAS_LIBRARIES << '\n';
+#else
+  log_stream << textline("BLAS:") << "Unknown\n";
+#endif
+
+  // Print number of threads
   if (options_.parallel == kOptionParallelOff)
     log_stream << textline("Threads:") << 1 << '\n';
   else
     log_stream << textline("Threads:") << highs::parallel::num_threads()
                << '\n';
+
   logH_.print(log_stream);
 
   // print information about model
