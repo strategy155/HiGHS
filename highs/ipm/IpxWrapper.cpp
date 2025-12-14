@@ -542,6 +542,19 @@ HighsStatus solveLpHipo(const HighsOptions& options, HighsTimer& timer,
     return HighsStatus::kError;
   }
 
+  // Parse hipo_system option
+  if (options.hipo_system_solver == kHipoHighsSolverString) {
+    hipo_options.system_solver = hipo::kOptionHighs;
+  } else if (options.hipo_system_solver == kHipoPardisoSolverString) {
+    hipo_options.system_solver = hipo::kOptionPardiso;
+  } else {
+    highsLogUser(options.log_options, HighsLogType::kError,
+                 "Unknown value of option %s\n", kHipoSystemString.c_str());
+    model_status = HighsModelStatus::kSolveError;
+    return HighsStatus::kError;
+  }
+
+
   // block size option
   hipo_options.block_size = options.hipo_block_size;
 

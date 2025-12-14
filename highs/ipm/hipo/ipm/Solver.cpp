@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "FactorHiGHSSolver.h"
 #include "ipm/hipo/auxiliary/Log.h"
 #include "parallel/HighsParallel.h"
 
@@ -77,8 +78,11 @@ bool Solver::initialise() {
   start_time_ = control_.elapsed();
 
   // initialise linear solver
-  LS_.reset(new FactorHiGHSSolver(options_, model_, regul_, &info_, &it_->data,
-                                  logH_));
+  if (options_.system_solver == kOptionPardiso )
+    LS_.reset(new PardisoSolver(model_, regul_, options_, logH_));
+  else if (options_.system_solver == kOptionHighs)
+    LS_.reset(new FactorHiGHSSolver(options_, model_, regul_, &info_, &it_->data,
+      logH_));
   if (Int status = LS_->setup()) {
     info_.status = (Status)status;
     return true;

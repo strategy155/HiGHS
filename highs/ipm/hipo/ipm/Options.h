@@ -15,6 +15,12 @@ enum OptionNla {
   kOptionNlaDefault = kOptionNlaChoose
 };
 
+enum OptionSystemSolver {
+  kOptionHighs = 0,
+  kOptionPardiso = 1,
+};
+
+
 enum OptionCrossover {
   kOptionCrossoverMin = 0,
   kOptionCrossoverOff = kOptionCrossoverMin,
@@ -40,6 +46,7 @@ struct Options {
   OptionNla nla = kOptionNlaDefault;
   OptionCrossover crossover = kOptionCrossoverDefault;
   OptionParallel parallel = kOptionParallelDefault;
+  OptionSystemSolver system_solver = kOptionPardiso;
 
   // Ipm parameters
   Int max_iter = kMaxIterDefault;

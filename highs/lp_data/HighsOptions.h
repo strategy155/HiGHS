@@ -298,6 +298,11 @@ const string kHipoSystemString = "hipo_system";
 const string kHipoAugmentedString = "augmented";
 const string kHipoNormalEqString = "normaleq";
 
+const string kHipoSystemSolverString = "hipo_system_solver";
+const string kHipoPardisoSolverString = "pardiso";
+const string kHipoHighsSolverString = "highs";
+
+
 // Strings for MIP LP/IPM options
 const string kMipLpSolverString = "mip_lp_solver";
 const string kMipIpmSolverString = "mip_ipm_solver";
@@ -370,6 +375,7 @@ struct HighsOptionsStruct {
   double ipm_optimality_tolerance;
   HighsInt ipm_iteration_limit;
   std::string hipo_system;
+  std::string hipo_system_solver;
   std::string hipo_parallel_type;
   HighsInt hipo_block_size;
 
@@ -541,6 +547,7 @@ struct HighsOptionsStruct {
         ipm_optimality_tolerance(0.0),
         ipm_iteration_limit(0),
         hipo_system(""),
+        hipo_system_solver(""),
         hipo_parallel_type(""),
         hipo_block_size(0),
         pdlp_scaling(false),
@@ -1252,6 +1259,13 @@ class HighsOptions : public HighsOptionsStruct {
         "HiPO Newton system option: \"augmented\", \"normaleq\" or \"choose\".",
         advanced, &hipo_system, kHighsChooseString);
     records.push_back(record_string);
+
+    record_string = new OptionRecordString(
+    kHipoSystemSolverString,
+    R"(HiPO Newton system solver option: "pardiso" or "highs")",
+    advanced, &hipo_system_solver, kHipoPardisoSolverString);
+    records.push_back(record_string);
+
 
     record_string =
         new OptionRecordString(kHipoParallelString,

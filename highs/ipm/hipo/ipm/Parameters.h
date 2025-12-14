@@ -43,6 +43,8 @@ struct Regularisation {
   double dual = 1e-10;
 };
 
+
+
 }  // namespace hipo
 
 #endif

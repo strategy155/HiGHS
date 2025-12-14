@@ -4,8 +4,8 @@
 #include <string>
 
 #include "Control.h"
-#include "FactorHiGHSSolver.h"
 #include "Info.h"
+#include "ipm/hipo/pardiso_wrapper/PardisoSolver.h"
 #include "Iterate.h"
 #include "LinearSolver.h"
 #include "LogHighs.h"

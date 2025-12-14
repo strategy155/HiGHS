@@ -445,14 +445,29 @@ endif()
 
 
 set(MKL_THREADING gnu_thread)
+set(MKL_INTERFACE lp64)
+set(EIGEN_USE_MKL_ALL)
 
 
-find_package(MKL CONFIG REQUIRED PATHS $ENV{MKLROOT})
+
+find_package(MKL CONFIG REQUIRED)
+
+find_package (Eigen3 REQUIRED)
+
 
 if(FAST_BUILD)
-    target_link_libraries(highs MKL::MKL)
+    target_link_libraries(highs PUBLIC MKL::MKL)
 else()
-    target_link_libraries(libhighs MKL::MKL)
+    target_link_libraries(libhighs PUBLIC MKL::MKL)
 endif()
+
+if(FAST_BUILD)
+    target_link_libraries(highs PUBLIC Eigen3::Eigen)
+else()
+    target_link_libraries(libhighs PUBLIC Eigen3::Eigen)
+endif()
+
+
+
 
 

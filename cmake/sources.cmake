@@ -176,15 +176,16 @@ set(ipx_headers
   ipm/ipx/timer.h
   ipm/ipx/utils.h)
 
-set(hipo_sources 
-    ipm/hipo/ipm/CurtisReidScaling.cpp 
-    ipm/hipo/ipm/IpmData.cpp 
-    ipm/hipo/ipm/FactorHiGHSSolver.cpp 
+set(hipo_sources
+    ipm/hipo/ipm/CurtisReidScaling.cpp
+    ipm/hipo/ipm/IpmData.cpp
+    ipm/hipo/ipm/FactorHiGHSSolver.cpp
     ipm/hipo/ipm/Control.cpp
-    ipm/hipo/ipm/Iterate.cpp 
+    ipm/hipo/ipm/Iterate.cpp
     ipm/hipo/ipm/LogHighs.cpp
     ipm/hipo/ipm/Model.cpp
-    ipm/hipo/ipm/Solver.cpp)
+    ipm/hipo/ipm/Solver.cpp
+    ipm/hipo/pardiso_wrapper/PardisoSolver.cpp)
 
 set(hipo_headers
     ipm/hipo/ipm/CurtisReidScaling.h
@@ -199,7 +200,8 @@ set(hipo_headers
     ipm/hipo/ipm/Model.h
     ipm/hipo/ipm/Options.h
     ipm/hipo/ipm/Solver.h
-    ipm/hipo/ipm/Status.h)
+    ipm/hipo/ipm/Status.h
+    ipm/hipo/pardiso_wrapper/PardisoSolver.h)
 
 set(factor_highs_sources
     ipm/hipo/factorhighs/Analyse.cpp
