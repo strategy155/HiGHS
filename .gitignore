@@ -293,3 +293,16 @@ highs-problem-set
 Options.md
 
 build-latest
+
+# HiPO benchmarking
+benchmarks/
+outputs/
+configs/
+installs/
+METIS/
+
+# Reference books and guidelines
+docs/guidelines/
+
+# Temporary benchmark outputs
+*.out
