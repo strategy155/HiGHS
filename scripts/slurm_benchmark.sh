@@ -28,22 +28,26 @@
 # Configuration
 # ============================================================================
 
-# Work directory selection:
-# - On CSCS: $SCRATCH = /capstor/scratch/cscs/$USER (30-day retention)
-# - Locally: ./hipo-build in current directory
+# This script is located in HiGHS/scripts/, so the HiGHS root is one level up.
+# Use realpath to get absolute paths (needed since script changes directories).
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+SOURCE_DIR="$(realpath "${SCRIPT_DIR}/..")"
+
+# Work directory for building dependencies and HiGHS:
+# - On CSCS cluster: use $SCRATCH (fast storage with 30-day retention)
+# - Locally: create hipo-build/ in the HiGHS source directory
 # See: https://docs.cscs.ch/platforms/hpcp/#scratch
 if [[ -n "${SCRATCH:-}" ]]; then
   WORK_DIR="${SCRATCH}/hipo-benchmark"
 else
-  WORK_DIR="$(pwd)/hipo-build"
+  WORK_DIR="${SOURCE_DIR}/hipo-build"
 fi
 
 readonly INSTALL_DIR="${WORK_DIR}/installs"
 readonly SRC_DIR="${WORK_DIR}/src"
 
-# HiGHS repository and branch
-readonly HIGHS_REPO="https://github.com/strategy155/HiGHS.git"
-readonly HIGHS_BRANCH="hipo-solvers"
+# Use half of available CPU cores for parallel builds
+readonly BUILD_JOBS="$(( $(nproc) / 2 ))"
 
 # ============================================================================
 # Setup
@@ -104,8 +108,8 @@ if [[ ! -f "${INSTALL_DIR}/lib/libmetis.so" ]]; then
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
     -DCMAKE_BUILD_TYPE=Release
 
-  echo "Building METIS..."
-  cmake --build metis-build --parallel
+  echo "Building METIS with ${BUILD_JOBS} jobs..."
+  cmake --build metis-build --parallel "${BUILD_JOBS}"
 
   echo "Installing METIS..."
   cmake --install metis-build
@@ -114,7 +118,7 @@ else
 fi
 
 # ============================================================================
-# Phase 3: Clone and Build HiGHS
+# Phase 3: Copy and Build HiGHS
 # ============================================================================
 
 echo ""
@@ -124,17 +128,11 @@ echo "=========================================="
 HIGHS_DIR="${SRC_DIR}/HiGHS"
 
 if [[ ! -d "${HIGHS_DIR}" ]]; then
-  echo "Cloning HiGHS from ${HIGHS_REPO}..."
-  cd "${SRC_DIR}"
-  git clone "${HIGHS_REPO}"
+  echo "Copying HiGHS source from ${SOURCE_DIR}..."
+  cp -r "${SOURCE_DIR}" "${HIGHS_DIR}"
 fi
 
 cd "${HIGHS_DIR}"
-
-echo "Checking out ${HIGHS_BRANCH}..."
-git fetch origin
-git checkout "${HIGHS_BRANCH}"
-git pull origin "${HIGHS_BRANCH}"
 
 echo "Configuring HiGHS..."
 cmake -S . -B build \
@@ -142,8 +140,8 @@ cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DMETIS_ROOT="${INSTALL_DIR}"
 
-echo "Building HiGHS..."
-cmake --build build --parallel
+echo "Building HiGHS with ${BUILD_JOBS} jobs..."
+cmake --build build --parallel "${BUILD_JOBS}"
 
 # ============================================================================
 # Phase 4: Run Benchmarks

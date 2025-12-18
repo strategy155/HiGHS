@@ -19,13 +19,14 @@ set -euo pipefail
 # ============================================================================
 
 readonly SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-readonly HIGHS_BIN="${SCRIPT_DIR}/build/bin/highs"
+readonly PROJECT_ROOT="${SCRIPT_DIR}/.."
+readonly HIGHS_BIN="${PROJECT_ROOT}/build/bin/highs"
 
 # Use first argument as benchmark directory, or default to benchmarks/
-readonly BENCHMARK_DIR="${1:-${SCRIPT_DIR}/benchmarks}"
-readonly LOG_FILE="${SCRIPT_DIR}/benchmark.log"
-readonly CONFIG_DIR="${SCRIPT_DIR}/configs"
-readonly OUTPUT_DIR="${SCRIPT_DIR}/outputs"
+readonly BENCHMARK_DIR="${1:-${PROJECT_ROOT}/benchmarks}"
+readonly LOG_FILE="${PROJECT_ROOT}/benchmark.log"
+readonly CONFIG_DIR="${PROJECT_ROOT}/configs"
+readonly OUTPUT_DIR="${PROJECT_ROOT}/outputs"
 
 # Detect maximum available threads using nproc (part of GNU coreutils).
 # The 'command -v' builtin returns 0 if the command exists, non-zero otherwise.
