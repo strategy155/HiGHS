@@ -159,7 +159,7 @@ echo "Verifying HiGHS binary..."
 
 # Run benchmarks on built-in test instances
 echo "Starting benchmark suite..."
-./benchmark_hipo.sh check/instances
+./scripts/benchmark_hipo.sh check/instances
 
 # ============================================================================
 # Summary
