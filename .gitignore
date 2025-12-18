@@ -300,6 +300,7 @@ outputs/
 configs/
 installs/
 METIS/
+hipo-build/
 
 # Reference books and guidelines
 docs/guidelines/
