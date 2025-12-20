@@ -7,26 +7,92 @@
 # {parallel off,on} × {1,max threads}
 #
 # Usage:
-#   ./benchmark_hipo.sh [benchmark_dir]
+#   ./benchmark_hipo.sh [options] [benchmark_dir]
 #
 # Arguments:
 #   benchmark_dir  Directory containing .mps files (default: benchmarks/)
+#
+# Options:
+#   --test              Run in test mode: 1 problem, 1 configuration only
+#   --time-limit SECS   Stop gracefully when SECS seconds have elapsed
+#                       (default: no limit for local, 24h for SLURM)
 
-set -euo pipefail
+# ============================================================================
+# Command Line Arguments
+# ============================================================================
+# Pattern: for-loop with case statement for self-documenting argument parsing.
+# Reference: https://www.baeldung.com/linux/bash-parse-command-line-arguments
+# ============================================================================
+
+show_usage() {
+  echo "Usage: $(basename "$0") [OPTIONS] [benchmark_dir]"
+  echo ""
+  echo "Options:"
+  echo "  --test              Run in test mode (1 problem, 1 config)"
+  echo "  --time-limit=SECS   Stop gracefully after SECS seconds"
+  echo "  --help              Show this help message"
+}
+
+# Default values
+TEST_MODE=false
+TIME_LIMIT=0
+BENCHMARK_DIR_ARG=""
+
+# Parse each argument
+for arg in "$@"; do
+  case "${arg}" in
+
+    --test)
+      TEST_MODE=true
+      ;;
+
+    --time-limit=*)
+      # Extract value after '=' using parameter expansion
+      # ${arg#*=} removes everything up to and including first '='
+      TIME_LIMIT="${arg#*=}"
+      ;;
+
+    --help)
+      show_usage
+      exit 0
+      ;;
+
+    --*)
+      echo "Unknown option: ${arg}" >&2
+      show_usage >&2
+      exit 1
+      ;;
+
+    *)
+      # Positional argument: benchmark directory
+      BENCHMARK_DIR_ARG="${arg}"
+      ;;
+
+  esac
+done
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
-readonly SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-readonly PROJECT_ROOT="${SCRIPT_DIR}/.."
-readonly HIGHS_BIN="${PROJECT_ROOT}/build/bin/highs"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+readonly SCRIPT_DIR
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+readonly PROJECT_ROOT
+HIGHS_BIN="${PROJECT_ROOT}/build/bin/highs"
+readonly HIGHS_BIN
 
-# Use first argument as benchmark directory, or default to benchmarks/
-readonly BENCHMARK_DIR="${1:-${PROJECT_ROOT}/benchmarks}"
+# Use parsed argument or default to benchmarks/
+if [[ -z "${BENCHMARK_DIR_ARG}" ]]; then
+  BENCHMARK_DIR="${PROJECT_ROOT}/benchmarks"
+else
+  BENCHMARK_DIR="${BENCHMARK_DIR_ARG}"
+fi
+readonly BENCHMARK_DIR
 readonly LOG_FILE="${PROJECT_ROOT}/benchmark.log"
 readonly CONFIG_DIR="${PROJECT_ROOT}/configs"
 readonly OUTPUT_DIR="${PROJECT_ROOT}/outputs"
+readonly TEMP_DIR="${PROJECT_ROOT}/temp"
 
 # Detect maximum available threads using nproc (part of GNU coreutils).
 # The 'command -v' builtin returns 0 if the command exists, non-zero otherwise.
@@ -35,7 +101,8 @@ if ! command -v nproc > /dev/null 2>&1; then
   echo "ERROR: nproc command not found. Please install GNU coreutils." >&2
   exit 1
 fi
-readonly MAX_THREADS=$(nproc)
+MAX_THREADS=$(nproc)
+readonly MAX_THREADS
 
 # Thread counts to test
 readonly THREAD_COUNTS=(1 "${MAX_THREADS}")
@@ -46,8 +113,104 @@ readonly SOLVERS=("highs" "pardiso")
 readonly PARALLEL_MODES=("off" "on")
 
 # ============================================================================
+# Time Tracking
+# ============================================================================
+# Record start time for graceful timeout (using seconds since epoch).
+# Reference: https://www.gnu.org/software/bash/manual/bash.html#index-date
+
+JOB_START_SECONDS=$(date +%s)
+readonly JOB_START_SECONDS
+
+# Safety margin: stop 5 minutes before the limit to allow cleanup
+readonly SAFETY_MARGIN_SECONDS=300
+
+# Check if we should stop due to time limit.
+#
+# Returns:
+#   0 if we should stop, 1 if we can continue
+should_stop_for_time_limit() {
+  # No limit set (0 means unlimited)
+  if [[ "${TIME_LIMIT}" -eq 0 ]]; then
+    return 1
+  fi
+
+  local current_seconds
+  current_seconds=$(date +%s)
+
+  local elapsed_seconds
+  elapsed_seconds=$((current_seconds - JOB_START_SECONDS))
+
+  local remaining_seconds
+  remaining_seconds=$((TIME_LIMIT - elapsed_seconds))
+
+  # Stop if remaining time is less than safety margin
+  if [[ "${remaining_seconds}" -lt "${SAFETY_MARGIN_SECONDS}" ]]; then
+    echo ""
+    echo "TIME LIMIT: Approaching limit (${remaining_seconds}s remaining)"
+    echo "Stopping gracefully to allow cleanup..."
+    return 0
+  fi
+
+  return 1
+}
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
+
+# Check if a file is bz2 compressed.
+#
+# Arguments:
+#   $1 - file path
+#
+# Returns:
+#   0 if compressed, 1 otherwise
+is_bz2_compressed() {
+  local file="$1"
+  [[ "${file}" == *.bz2 ]]
+}
+
+# Decompress a .bz2 file to TEMP_DIR and return the path.
+# The decompressed file should be cleaned up after use.
+#
+# Arguments:
+#   $1 - compressed file path
+#
+# Outputs:
+#   Path to decompressed file in TEMP_DIR
+decompress_bz2() {
+  local compressed_file="$1"
+  local name
+  name=$(basename "${compressed_file}" .bz2)
+  local temp_file="${TEMP_DIR}/${name}"
+
+  bunzip2 -k -c "${compressed_file}" > "${temp_file}"
+  echo "${temp_file}"
+}
+
+# Remove a temporary file if it exists.
+#
+# Arguments:
+#   $1 - file path
+cleanup_temp_file() {
+  local file="$1"
+  rm -f "${file}"
+}
+
+# Get the problem name from a file path, stripping .bz2 if present.
+#
+# Arguments:
+#   $1 - file path
+#
+# Outputs:
+#   Problem name (basename without .bz2)
+get_problem_name() {
+  local file="$1"
+  local name
+  name=$(basename "${file}")
+  # Remove .bz2 suffix if present
+  echo "${name%.bz2}"
+}
 
 # Generate an options file for a specific configuration.
 #
@@ -110,8 +273,13 @@ run_configuration() {
   for problem_path in "${problems_ref[@]}"; do
     current_run_ref=$((current_run_ref + 1))
 
+    # Check time limit before starting a new problem
+    if should_stop_for_time_limit; then
+      return 0  # Exit gracefully (not an error)
+    fi
+
     local problem_name
-    problem_name=$(basename "${problem_path}")
+    problem_name=$(get_problem_name "${problem_path}")
 
     local output_file="${OUTPUT_DIR}/${config_name}_${problem_name}.out"
 
@@ -123,19 +291,32 @@ run_configuration() {
 
     echo "[${current_run_ref}/${total_runs}] Running: ${problem_name} (${config_name})"
 
+    # Handle compressed files: decompress to temp location
+    local model_file="${problem_path}"
+    local temp_file=""
+
+    if is_bz2_compressed "${problem_path}"; then
+      temp_file=$(decompress_bz2 "${problem_path}")
+      model_file="${temp_file}"
+    fi
+
     # Set thread count explicitly via environment variable
     export OMP_NUM_THREADS="${threads}"
 
     # Run solver and capture output
-    # Use || true to prevent script exit on solver failure
     if "${HIGHS_BIN}" --solver hipo \
         --parallel "${parallel}" \
-        --model_file "${problem_path}" \
+        --model_file "${model_file}" \
         --options_file "${config_file}" \
         > "${output_file}" 2>&1; then
       echo "  Completed successfully"
     else
       echo "  Solver returned non-zero exit code"
+    fi
+
+    # Clean up temporary decompressed file
+    if [[ -n "${temp_file}" ]]; then
+      cleanup_temp_file "${temp_file}"
     fi
 
     # Log to file
@@ -148,20 +329,30 @@ run_configuration() {
 # ============================================================================
 
 main() {
+  local start_time
+  start_time=$(date)
+
   echo "=========================================="
   echo "HiGHS HiPO Benchmarking Script"
   echo "=========================================="
-  echo "Start time: $(date)"
+  echo "Start time: ${start_time}"
   echo "Max threads detected: ${MAX_THREADS}"
+  if [[ "${TIME_LIMIT}" -gt 0 ]]; then
+    echo "Time limit: ${TIME_LIMIT}s (safety margin: ${SAFETY_MARGIN_SECONDS}s)"
+  else
+    echo "Time limit: none"
+  fi
   echo ""
 
   # Create necessary directories
-  mkdir -p "${CONFIG_DIR}" "${OUTPUT_DIR}"
+  mkdir -p "${CONFIG_DIR}" "${OUTPUT_DIR}" "${TEMP_DIR}"
 
   # Initialize log file
+  local log_start_time
+  log_start_time=$(date)
   {
     echo "========================================="
-    echo "Benchmark started: $(date)"
+    echo "Benchmark started: ${log_start_time}"
     echo "========================================="
   } >> "${LOG_FILE}"
 
@@ -171,41 +362,74 @@ main() {
     exit 1
   fi
 
-  # Find all .mps benchmark files
+  # Find all benchmark files (.mps or .mps.bz2)
   echo "Searching for benchmark problems in ${BENCHMARK_DIR}..."
 
-  # Recursively find all .mps files in benchmark directory
-  local found_files
-  found_files=$(find "${BENCHMARK_DIR}" -name "*.mps" -type f)
+  # Find uncompressed .mps files
+  local mps_files
+  mps_files=$(find "${BENCHMARK_DIR}" -name "*.mps" -type f)
 
-  # Sort file paths alphabetically for consistent ordering
+  # Find compressed .mps.bz2 files
+  local bz2_files
+  bz2_files=$(find "${BENCHMARK_DIR}" -name "*.mps.bz2" -type f)
+
+  # Combine results into single string
+  local combined_files
+  combined_files=$(printf '%s\n%s' "${mps_files}" "${bz2_files}")
+
+  # Filter out empty lines
+  local filtered_files
+  filtered_files=$(grep -v '^$' <<< "${combined_files}")
+
+  # Sort alphabetically
   local sorted_files
-  sorted_files=$(sort <<< "${found_files}")
+  sorted_files=$(sort <<< "${filtered_files}")
 
-  # Load sorted file paths into array using here string
+  # Load sorted file paths into array
   local -a problems
   mapfile -t problems <<< "${sorted_files}"
 
   local num_problems="${#problems[@]}"
 
   if [[ "${num_problems}" -eq 0 ]]; then
-    echo "ERROR: No .mps files found in ${BENCHMARK_DIR}" >&2
+    echo "ERROR: No .mps or .mps.bz2 files found in ${BENCHMARK_DIR}" >&2
     exit 1
+  fi
+
+  # Test mode: limit to first problem only
+  if [[ "${TEST_MODE}" == true ]]; then
+    echo "TEST MODE: Using only first problem"
+    problems=("${problems[0]}")
+    num_problems=1
   fi
 
   echo "Found ${num_problems} problems"
   echo ""
 
+  # Test mode: use single configuration
+  local systems_to_test=("${SYSTEMS[@]}")
+  local solvers_to_test=("${SOLVERS[@]}")
+  local parallel_modes_to_test=("${PARALLEL_MODES[@]}")
+  local thread_counts_to_test=("${THREAD_COUNTS[@]}")
+
+  if [[ "${TEST_MODE}" == true ]]; then
+    echo "TEST MODE: Using single configuration"
+    systems_to_test=("${SYSTEMS[0]}")
+    solvers_to_test=("${SOLVERS[0]}")
+    parallel_modes_to_test=("${PARALLEL_MODES[0]}")
+    thread_counts_to_test=("${THREAD_COUNTS[0]}")
+  fi
+
   # Calculate total number of runs
   local num_configs
-  num_configs=$((${#SYSTEMS[@]} * ${#SOLVERS[@]} * ${#PARALLEL_MODES[@]} * ${#THREAD_COUNTS[@]}))
+  num_configs=$((${#systems_to_test[@]} * ${#solvers_to_test[@]} * ${#parallel_modes_to_test[@]} * ${#thread_counts_to_test[@]}))
   local total_runs=$((num_problems * num_configs))
 
   echo "Configuration matrix:"
-  echo "  Systems: ${SYSTEMS[*]}"
-  echo "  Solvers: ${SOLVERS[*]}"
-  echo "  Parallel modes: ${PARALLEL_MODES[*]}"
-  echo "  Thread counts: ${THREAD_COUNTS[*]}"
+  echo "  Systems: ${systems_to_test[*]}"
+  echo "  Solvers: ${solvers_to_test[*]}"
+  echo "  Parallel modes: ${parallel_modes_to_test[*]}"
+  echo "  Thread counts: ${thread_counts_to_test[*]}"
   echo "  Total configurations: ${num_configs}"
   echo "  Total runs: ${total_runs}"
   echo ""
@@ -215,10 +439,10 @@ main() {
   local skipped_runs=0
 
   # Build flat list of configurations and iterate
-  for system in "${SYSTEMS[@]}"; do
-    for solver in "${SOLVERS[@]}"; do
-      for parallel in "${PARALLEL_MODES[@]}"; do
-        for threads in "${THREAD_COUNTS[@]}"; do
+  for system in "${systems_to_test[@]}"; do
+    for solver in "${solvers_to_test[@]}"; do
+      for parallel in "${parallel_modes_to_test[@]}"; do
+        for threads in "${thread_counts_to_test[@]}"; do
           run_configuration "${system}" "${solver}" "${parallel}" "${threads}" \
             problems current_run skipped_runs "${total_runs}"
         done
@@ -228,6 +452,9 @@ main() {
 
   # Print summary
   local completed_runs=$((current_run - skipped_runs))
+  local end_time
+  end_time=$(date)
+
   echo ""
   echo "=========================================="
   echo "Benchmarking Complete"
@@ -235,13 +462,13 @@ main() {
   echo "Total runs: ${total_runs}"
   echo "Completed: ${completed_runs}"
   echo "Skipped: ${skipped_runs}"
-  echo "End time: $(date)"
+  echo "End time: ${end_time}"
   echo "Output directory: ${OUTPUT_DIR}"
 
   # Log summary
   {
     echo "========================================="
-    echo "Benchmark finished: $(date)"
+    echo "Benchmark finished: ${end_time}"
     echo "Completed: ${completed_runs}, Skipped: ${skipped_runs}"
     echo "========================================="
   } >> "${LOG_FILE}"

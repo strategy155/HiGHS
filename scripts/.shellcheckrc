@@ -1,0 +1,5 @@
+# ShellCheck configuration for HiGHS benchmark scripts
+# See: https://www.shellcheck.net/wiki/
+
+# Enable all optional checks
+enable=all
