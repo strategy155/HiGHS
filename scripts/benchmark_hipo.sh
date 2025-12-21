@@ -271,12 +271,12 @@ run_configuration() {
   generate_options_file "${system}" "${solver}" "${config_file}"
 
   for problem_path in "${problems_ref[@]}"; do
-    current_run_ref=$((current_run_ref + 1))
-
     # Check time limit before starting a new problem
     if should_stop_for_time_limit; then
-      return 0  # Exit gracefully (not an error)
+      return 1  # Signal time limit reached
     fi
+
+    current_run_ref=$((current_run_ref + 1))
 
     local problem_name
     problem_name=$(get_problem_name "${problem_path}")
@@ -439,12 +439,13 @@ main() {
   local skipped_runs=0
 
   # Build flat list of configurations and iterate
+  # If run_configuration returns 1 (time limit), break all 4 loops
   for system in "${systems_to_test[@]}"; do
     for solver in "${solvers_to_test[@]}"; do
       for parallel in "${parallel_modes_to_test[@]}"; do
         for threads in "${thread_counts_to_test[@]}"; do
           run_configuration "${system}" "${solver}" "${parallel}" "${threads}" \
-            problems current_run skipped_runs "${total_runs}"
+            problems current_run skipped_runs "${total_runs}" || break 4
         done
       done
     done
