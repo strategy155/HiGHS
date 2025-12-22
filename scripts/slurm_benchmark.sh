@@ -14,6 +14,10 @@
 #
 # Options:
 #   --test  Run in test mode: download only ex10.mps.bz2, run 1 config
+#
+# First-time setup on CSCS (run once before sbatch):
+#   uenv repo create
+#   uenv image pull prgenv-gnu/25.11:v1
 
 #SBATCH --job-name=hipo-benchmark
 #SBATCH --partition=normal
@@ -27,7 +31,8 @@
 
 # Load uenv environment (provides compilers, spack)
 # See: https://docs.cscs.ch/software/uenv/using/
-#SBATCH --uenv=prgenv-gnu/24.11:v1
+# Note: Before first use, run: uenv repo create && uenv image pull prgenv-gnu/25.11:v1
+#SBATCH --uenv=prgenv-gnu/25.11:v1
 #SBATCH --view=spack
 
 # ============================================================================
