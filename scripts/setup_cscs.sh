@@ -100,7 +100,7 @@ echo ""
 echo "Step 4: Creating MKL build environment"
 echo "=========================================="
 
-uenv-spack "${MKL_ENV_DIR}" --uarch="${UENV_ARCH}" --name="${MKL_ENV_NAME}"
+uenv run "${UENV_IMAGE}" --view=spack -- "${UENV_SPACK_DIR}/uenv-spack" "${MKL_ENV_DIR}" --uarch="${UENV_ARCH}" --name="${MKL_ENV_NAME}"
 
 # Step 5: Copy our spack.yaml with MKL spec
 echo ""
