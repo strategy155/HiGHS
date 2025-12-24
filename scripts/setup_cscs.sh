@@ -102,17 +102,47 @@ echo "=========================================="
 
 uenv run "${UENV_IMAGE}" --view=spack -- "${UENV_SPACK_DIR}/uenv-spack" "${MKL_ENV_DIR}" --uarch="${UENV_ARCH}" --name="${MKL_ENV_NAME}"
 
-# Step 5: Add MKL spec to the environment
-# Use 'spack add' which is the standard way to add packages to a spack environment.
-# This preserves the view configuration that uenv-spack created.
-# Reference: https://spack.readthedocs.io/en/latest/environments.html#adding-specs
+# Step 5: Add MKL spec to the generated spack.yaml
+# The uenv-spack template creates a spack.yaml with view configuration.
+# We add our package to the specs list, preserving all other settings.
 echo ""
 echo "Step 5: Adding intel-oneapi-mkl to environment"
 echo "=========================================="
 
-uenv run "${UENV_IMAGE}" --view=spack -- spack -e "${MKL_ENV_DIR}/env" add intel-oneapi-mkl
+spack_yaml="${MKL_ENV_DIR}/env/spack.yaml"
+mkl_spec="intel-oneapi-mkl"
 
-echo "Added intel-oneapi-mkl spec"
+# Patterns for detecting spack.yaml format:
+#   Empty array:   "specs: []"
+#   Multi-line:    "specs:" followed by "  - package"
+empty_specs_pattern="specs: \[\]"
+multiline_specs_pattern="^  specs:$"
+
+# Sed expressions for adding the spec
+empty_specs_replacement="specs:\n    - ${mkl_spec}"
+new_spec_line="    - ${mkl_spec}"
+
+# Show current specs section for debugging
+echo "Current spack.yaml specs section:"
+grep -A 5 "specs" "${spack_yaml}" || echo "  (specs section not found)"
+
+# Check if intel-oneapi-mkl is already in the file
+if grep -q "${mkl_spec}" "${spack_yaml}"; then
+  echo "${mkl_spec} already present"
+elif grep -q "${empty_specs_pattern}" "${spack_yaml}"; then
+  # Empty array format: replace with multi-line list
+  sed -i "s/${empty_specs_pattern}/${empty_specs_replacement}/" "${spack_yaml}"
+  echo "Replaced empty specs with ${mkl_spec}"
+else
+  # Multi-line format: append after 'specs:' line
+  sed -i "/${multiline_specs_pattern}/a\\${new_spec_line}" "${spack_yaml}"
+  echo "Added ${mkl_spec} to existing specs list"
+fi
+
+# Show updated specs section for verification
+echo ""
+echo "Updated spack.yaml specs section:"
+grep -A 5 "specs" "${spack_yaml}"
 
 # Step 6: Build the environment
 echo ""
