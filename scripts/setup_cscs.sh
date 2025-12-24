@@ -127,14 +127,15 @@ grep -A 5 "specs" "${spack_yaml}" || echo "  (specs section not found)"
 
 # Check if intel-oneapi-mkl is already in the file
 # Use --fixed-strings for literal matching (patterns contain # and spaces)
+# Use -- to mark end of options (patterns start with -)
 # Reference: https://www.gnu.org/software/grep/manual/grep.html
-if grep --quiet --fixed-strings "${mkl_spec}" "${spack_yaml}"; then
+if grep --quiet --fixed-strings -- "${mkl_spec}" "${spack_yaml}"; then
   echo "${mkl_spec} already present"
-elif grep --quiet --fixed-strings "${template_specs_placeholder}" "${spack_yaml}"; then
+elif grep --quiet --fixed-strings -- "${template_specs_placeholder}" "${spack_yaml}"; then
   # uenv-spack template: replace placeholder comment with our spec
   sed -i "s/${template_specs_placeholder}/${mkl_spec_entry}/" "${spack_yaml}"
   echo "Replaced placeholder with ${mkl_spec}"
-elif grep --quiet --fixed-strings "${empty_specs_array}" "${spack_yaml}"; then
+elif grep --quiet --fixed-strings -- "${empty_specs_array}" "${spack_yaml}"; then
   # Empty array format: replace with multi-line list
   sed -i "s/${empty_specs_array}/specs:\n  ${mkl_spec_entry}/" "${spack_yaml}"
   echo "Replaced empty specs with ${mkl_spec}"
