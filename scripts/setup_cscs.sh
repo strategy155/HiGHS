@@ -102,14 +102,17 @@ echo "=========================================="
 
 uenv run "${UENV_IMAGE}" --view=spack -- "${UENV_SPACK_DIR}/uenv-spack" "${MKL_ENV_DIR}" --uarch="${UENV_ARCH}" --name="${MKL_ENV_NAME}"
 
-# Step 5: Copy our spack.yaml with MKL spec
+# Step 5: Add MKL spec to the environment
+# Use 'spack add' which is the standard way to add packages to a spack environment.
+# This preserves the view configuration that uenv-spack created.
+# Reference: https://spack.readthedocs.io/en/latest/environments.html#adding-specs
 echo ""
-echo "Step 5: Configuring spack.yaml"
+echo "Step 5: Adding intel-oneapi-mkl to environment"
 echo "=========================================="
 
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-cp "${SCRIPT_DIR}/cscs_spack.yaml" "${MKL_ENV_DIR}/env/spack.yaml"
-echo "Copied cscs_spack.yaml to ${MKL_ENV_DIR}/env/"
+uenv run "${UENV_IMAGE}" --view=spack -- spack -e "${MKL_ENV_DIR}/env" add intel-oneapi-mkl
+
+echo "Added intel-oneapi-mkl spec"
 
 # Step 6: Build the environment
 echo ""
