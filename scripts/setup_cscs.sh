@@ -115,26 +115,28 @@ mkl_spec="intel-oneapi-mkl"
 # Patterns for detecting spack.yaml format from uenv-spack template:
 #   Placeholder:   "- # add specs here"
 #   Empty array:   "specs: []"
-placeholder_pattern="- # add specs here"
-empty_specs_pattern="specs: \[\]"
+template_specs_placeholder="- # add specs here"
+empty_specs_array="specs: \[\]"
 
-# Replacement spec line (2-space indent to match uenv-spack format)
-spec_line="- ${mkl_spec}"
+# Replacement spec entry (2-space indent to match uenv-spack format)
+mkl_spec_entry="- ${mkl_spec}"
 
 # Show current specs section for debugging
 echo "Current spack.yaml specs section:"
 grep -A 5 "specs" "${spack_yaml}" || echo "  (specs section not found)"
 
 # Check if intel-oneapi-mkl is already in the file
-if grep -q "${mkl_spec}" "${spack_yaml}"; then
+# Use --fixed-strings for literal matching (patterns contain # and spaces)
+# Reference: https://www.gnu.org/software/grep/manual/grep.html
+if grep --quiet --fixed-strings "${mkl_spec}" "${spack_yaml}"; then
   echo "${mkl_spec} already present"
-elif grep -q "${placeholder_pattern}" "${spack_yaml}"; then
+elif grep --quiet --fixed-strings "${template_specs_placeholder}" "${spack_yaml}"; then
   # uenv-spack template: replace placeholder comment with our spec
-  sed -i "s/${placeholder_pattern}/${spec_line}/" "${spack_yaml}"
+  sed -i "s/${template_specs_placeholder}/${mkl_spec_entry}/" "${spack_yaml}"
   echo "Replaced placeholder with ${mkl_spec}"
-elif grep -q "${empty_specs_pattern}" "${spack_yaml}"; then
+elif grep --quiet --fixed-strings "${empty_specs_array}" "${spack_yaml}"; then
   # Empty array format: replace with multi-line list
-  sed -i "s/${empty_specs_pattern}/specs:\n  ${spec_line}/" "${spack_yaml}"
+  sed -i "s/${empty_specs_array}/specs:\n  ${mkl_spec_entry}/" "${spack_yaml}"
   echo "Replaced empty specs with ${mkl_spec}"
 else
   echo "ERROR: Unknown spack.yaml format. Please add ${mkl_spec} manually." >&2
