@@ -110,6 +110,11 @@ echo "Step 5: Adding intel-oneapi-mkl to environment"
 echo "=========================================="
 
 spack_yaml="${MKL_ENV_DIR}/env/spack.yaml"
+
+# Packages to install:
+#   cmake@3.22: - HiGHS requires cmake 3.22+ (Eiger has 3.20)
+#   intel-oneapi-mkl - Required for Pardiso solver
+cmake_spec="cmake@3.22:"
 mkl_spec="intel-oneapi-mkl"
 
 # Patterns for detecting spack.yaml format from uenv-spack template:
@@ -118,29 +123,30 @@ mkl_spec="intel-oneapi-mkl"
 template_specs_placeholder="- # add specs here"
 empty_specs_array="specs: \[\]"
 
-# Replacement spec entry (2-space indent to match uenv-spack format)
-mkl_spec_entry="- ${mkl_spec}"
+# Replacement spec entries (2-space indent to match uenv-spack format)
+# Use \n to add multiple specs on separate lines
+specs_entries="- ${cmake_spec}\n  - ${mkl_spec}"
 
 # Show current specs section for debugging
 echo "Current spack.yaml specs section:"
 grep -A 5 "specs" "${spack_yaml}" || echo "  (specs section not found)"
 
-# Check if intel-oneapi-mkl is already in the file
+# Check if specs are already in the file
 # Use --fixed-strings for literal matching (patterns contain # and spaces)
 # Use -- to mark end of options (patterns start with -)
 # Reference: https://www.gnu.org/software/grep/manual/grep.html
 if grep --quiet --fixed-strings -- "${mkl_spec}" "${spack_yaml}"; then
-  echo "${mkl_spec} already present"
+  echo "Specs already present"
 elif grep --quiet --fixed-strings -- "${template_specs_placeholder}" "${spack_yaml}"; then
-  # uenv-spack template: replace placeholder comment with our spec
-  sed -i "s/${template_specs_placeholder}/${mkl_spec_entry}/" "${spack_yaml}"
-  echo "Replaced placeholder with ${mkl_spec}"
+  # uenv-spack template: replace placeholder comment with our specs
+  sed -i "s/${template_specs_placeholder}/${specs_entries}/" "${spack_yaml}"
+  echo "Added ${cmake_spec} and ${mkl_spec}"
 elif grep --quiet --fixed-strings -- "${empty_specs_array}" "${spack_yaml}"; then
   # Empty array format: replace with multi-line list
-  sed -i "s/${empty_specs_array}/specs:\n  ${mkl_spec_entry}/" "${spack_yaml}"
-  echo "Replaced empty specs with ${mkl_spec}"
+  sed -i "s/${empty_specs_array}/specs:\n  ${specs_entries}/" "${spack_yaml}"
+  echo "Added ${cmake_spec} and ${mkl_spec}"
 else
-  echo "ERROR: Unknown spack.yaml format. Please add ${mkl_spec} manually." >&2
+  echo "ERROR: Unknown spack.yaml format. Please add specs manually." >&2
   exit 1
 fi
 
