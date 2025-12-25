@@ -113,10 +113,12 @@ spack_yaml="${MKL_ENV_DIR}/env/spack.yaml"
 
 # Packages to install:
 #   cmake@3.22: - HiGHS requires cmake 3.22+ (Eiger has 3.20)
+#   eigen - Required by HiPO solver
 #   intel-oneapi-mkl - Required for Pardiso solver
 # Specs with version ranges must be quoted to prevent YAML parsing issues
 # Reference: https://spack.readthedocs.io/en/latest/packages_yaml.html
 cmake_spec="'cmake@3.22:'"
+eigen_spec="eigen"
 mkl_spec="intel-oneapi-mkl"
 
 # Patterns for detecting spack.yaml format from uenv-spack template:
@@ -127,7 +129,7 @@ empty_specs_array="specs: \[\]"
 
 # Replacement spec entries (2-space indent to match uenv-spack format)
 # Use \n to add multiple specs on separate lines
-specs_entries="- ${cmake_spec}\n  - ${mkl_spec}"
+specs_entries="- ${cmake_spec}\n  - ${eigen_spec}\n  - ${mkl_spec}"
 
 # Show current specs section for debugging
 echo "Current spack.yaml specs section:"
@@ -142,11 +144,11 @@ if grep --quiet --fixed-strings -- "${mkl_spec}" "${spack_yaml}"; then
 elif grep --quiet --fixed-strings -- "${template_specs_placeholder}" "${spack_yaml}"; then
   # uenv-spack template: replace placeholder comment with our specs
   sed -i "s/${template_specs_placeholder}/${specs_entries}/" "${spack_yaml}"
-  echo "Added ${cmake_spec} and ${mkl_spec}"
+  echo "Added cmake, eigen, and intel-oneapi-mkl"
 elif grep --quiet --fixed-strings -- "${empty_specs_array}" "${spack_yaml}"; then
   # Empty array format: replace with multi-line list
   sed -i "s/${empty_specs_array}/specs:\n  ${specs_entries}/" "${spack_yaml}"
-  echo "Added ${cmake_spec} and ${mkl_spec}"
+  echo "Added cmake, eigen, and intel-oneapi-mkl"
 else
   echo "ERROR: Unknown spack.yaml format. Please add specs manually." >&2
   exit 1
