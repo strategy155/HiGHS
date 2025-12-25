@@ -114,7 +114,9 @@ spack_yaml="${MKL_ENV_DIR}/env/spack.yaml"
 # Packages to install:
 #   cmake@3.22: - HiGHS requires cmake 3.22+ (Eiger has 3.20)
 #   intel-oneapi-mkl - Required for Pardiso solver
-cmake_spec="cmake@3.22:"
+# Specs with version ranges must be quoted to prevent YAML parsing issues
+# Reference: https://spack.readthedocs.io/en/latest/packages_yaml.html
+cmake_spec="'cmake@3.22:'"
 mkl_spec="intel-oneapi-mkl"
 
 # Patterns for detecting spack.yaml format from uenv-spack template:
