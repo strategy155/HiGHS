@@ -30,13 +30,23 @@ show_usage() {
   echo "Options:"
   echo "  --test              Run in test mode (1 problem, 1 config)"
   echo "  --time-limit=SECS   Stop gracefully after SECS seconds"
+  echo "  --generate-tasks=FILE  Generate task list file for SLURM array jobs"
+  echo "  --task-list=FILE    Read tasks from file (for array jobs)"
   echo "  --help              Show this help message"
+  echo ""
+  echo "Array Job Mode:"
+  echo "  When SLURM_ARRAY_TASK_ID is set and --task-list is provided,"
+  echo "  runs only the task at that line number from the task list."
+  echo ""
+  echo "Reference: https://slurm.schedmd.com/job_array.html"
 }
 
 # Default values
 TEST_MODE=false
 TIME_LIMIT=0
 BENCHMARK_DIR_ARG=""
+GENERATE_TASKS_FILE=""
+TASK_LIST_FILE=""
 
 # Parse each argument
 for arg in "$@"; do
@@ -50,6 +60,14 @@ for arg in "$@"; do
       # Extract value after '=' using parameter expansion
       # ${arg#*=} removes everything up to and including first '='
       TIME_LIMIT="${arg#*=}"
+      ;;
+
+    --generate-tasks=*)
+      GENERATE_TASKS_FILE="${arg#*=}"
+      ;;
+
+    --task-list=*)
+      TASK_LIST_FILE="${arg#*=}"
       ;;
 
     --help)
@@ -243,6 +261,93 @@ is_run_completed() {
   [[ -f "${output_file}" ]]
 }
 
+# Get config name from parameters.
+get_config_name() {
+  local system="$1"
+  local solver="$2"
+  local parallel="$3"
+  local threads="$4"
+  echo "${system}-${solver}-par${parallel}-t${threads}"
+}
+
+# Run a single task from the task list (for SLURM array jobs).
+run_array_task() {
+  local task_id="${SLURM_ARRAY_TASK_ID}"
+  local line_num=$((task_id + 1))
+
+  local task_line
+  task_line=$(sed -n "${line_num}p" "${TASK_LIST_FILE}")
+
+  if [[ -z "${task_line}" ]]; then
+    echo "ERROR: No task at line ${line_num}" >&2
+    return 1
+  fi
+
+  IFS='|' read -r problem_path system solver parallel threads <<< "${task_line}"
+
+  local problem_name
+  problem_name=$(get_problem_name "${problem_path}")
+
+  local config_name
+  config_name=$(get_config_name "${system}" "${solver}" "${parallel}" "${threads}")
+
+  local config_file="${CONFIG_DIR}/${config_name}.txt"
+  local output_file="${OUTPUT_DIR}/${config_name}_${problem_name}.out"
+
+  echo "Task ${task_id}: ${problem_name} [${config_name}]"
+
+  if is_run_completed "${output_file}"; then
+    echo "  SKIP: Already completed"
+    return 0
+  fi
+
+  generate_options_file "${system}" "${solver}" "${config_file}"
+  run_single_problem "${problem_path}" "${config_file}" "${output_file}" \
+    "${parallel}" "${threads}"
+
+  echo "${problem_name} ${config_name}" >> "${LOG_FILE}"
+}
+
+# Run a single problem with a given configuration.
+#
+# Arguments:
+#   $1 - problem file path
+#   $2 - config file path (options file)
+#   $3 - output file path
+#   $4 - parallel mode (on/off)
+#   $5 - thread count
+run_single_problem() {
+  local problem_path="$1"
+  local config_file="$2"
+  local output_file="$3"
+  local parallel="$4"
+  local threads="$5"
+
+  local model_file="${problem_path}"
+  local temp_file=""
+
+  if is_bz2_compressed "${problem_path}"; then
+    temp_file=$(decompress_bz2 "${problem_path}")
+    model_file="${temp_file}"
+  fi
+
+  export OMP_NUM_THREADS="${threads}"
+
+  if "${HIGHS_BIN}" --solver hipo \
+      --parallel "${parallel}" \
+      --model_file "${model_file}" \
+      --options_file "${config_file}" \
+      > "${output_file}" 2>&1; then
+    echo "  Completed successfully"
+  else
+    echo "  Solver returned non-zero exit code"
+  fi
+
+  if [[ -n "${temp_file}" ]]; then
+    cleanup_temp_file "${temp_file}"
+  fi
+}
+
 # Run all benchmark problems for a single configuration.
 #
 # Arguments:
@@ -264,7 +369,8 @@ run_configuration() {
   local -n skipped_ref="$7"
   local total_runs="$8"
 
-  local config_name="${system}-${solver}-par${parallel}-t${threads}"
+  local config_name
+  config_name=$(get_config_name "${system}" "${solver}" "${parallel}" "${threads}")
   local config_file="${CONFIG_DIR}/${config_name}.txt"
 
   # Generate options file
@@ -291,35 +397,9 @@ run_configuration() {
 
     echo "[${current_run_ref}/${total_runs}] Running: ${problem_name} (${config_name})"
 
-    # Handle compressed files: decompress to temp location
-    local model_file="${problem_path}"
-    local temp_file=""
+    run_single_problem "${problem_path}" "${config_file}" "${output_file}" \
+      "${parallel}" "${threads}"
 
-    if is_bz2_compressed "${problem_path}"; then
-      temp_file=$(decompress_bz2 "${problem_path}")
-      model_file="${temp_file}"
-    fi
-
-    # Set thread count explicitly via environment variable
-    export OMP_NUM_THREADS="${threads}"
-
-    # Run solver and capture output
-    if "${HIGHS_BIN}" --solver hipo \
-        --parallel "${parallel}" \
-        --model_file "${model_file}" \
-        --options_file "${config_file}" \
-        > "${output_file}" 2>&1; then
-      echo "  Completed successfully"
-    else
-      echo "  Solver returned non-zero exit code"
-    fi
-
-    # Clean up temporary decompressed file
-    if [[ -n "${temp_file}" ]]; then
-      cleanup_temp_file "${temp_file}"
-    fi
-
-    # Log to file
     echo "${problem_name} ${config_name}" >> "${LOG_FILE}"
   done
 }
@@ -360,6 +440,13 @@ main() {
   if [[ ! -x "${HIGHS_BIN}" ]]; then
     echo "ERROR: HiGHS binary not found or not executable at ${HIGHS_BIN}" >&2
     exit 1
+  fi
+
+  # Array task mode: run single task from task list
+  # Reference: https://slurm.schedmd.com/job_array.html
+  if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]] && [[ -n "${TASK_LIST_FILE}" ]]; then
+    run_array_task
+    exit 0
   fi
 
   # Find all benchmark files (.mps or .mps.bz2)
@@ -433,6 +520,25 @@ main() {
   echo "  Total configurations: ${num_configs}"
   echo "  Total runs: ${total_runs}"
   echo ""
+
+  # Task list generation mode: output tasks and exit
+  if [[ -n "${GENERATE_TASKS_FILE}" ]]; then
+    echo "Generating task list to ${GENERATE_TASKS_FILE}..."
+    for problem_path in "${problems[@]}"; do
+      for system in "${systems_to_test[@]}"; do
+        for solver in "${solvers_to_test[@]}"; do
+          for parallel in "${parallel_modes_to_test[@]}"; do
+            for threads in "${thread_counts_to_test[@]}"; do
+              echo "${problem_path}|${system}|${solver}|${parallel}|${threads}"
+            done
+          done
+        done
+      done
+    done > "${GENERATE_TASKS_FILE}"
+    echo "Generated ${total_runs} tasks"
+    echo "Use: sbatch --array=0-$((total_runs - 1))%32 ..."
+    exit 0
+  fi
 
   # Counters for progress tracking
   local current_run=0
