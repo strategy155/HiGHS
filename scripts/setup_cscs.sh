@@ -118,7 +118,7 @@ spack_yaml="${MKL_ENV_DIR}/env/spack.yaml"
 # Specs with version ranges must be quoted to prevent YAML parsing issues
 # Reference: https://spack.readthedocs.io/en/latest/packages_yaml.html
 cmake_spec="'cmake@3.22:'"
-eigen_spec="eigen"
+eigen_spec="'eigen@3.4'"  # Pin to 3.4.x (5.0.0 has build issues)
 mkl_spec="intel-oneapi-mkl"
 
 # Patterns for detecting spack.yaml format from uenv-spack template:
