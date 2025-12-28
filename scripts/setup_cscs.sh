@@ -159,9 +159,28 @@ echo ""
 echo "Updated spack.yaml specs section:"
 grep -A 5 "specs" "${spack_yaml}"
 
-# Step 6: Build the environment
+# Step 6: Configure spack to use SCRATCH for build staging
+# /tmp on compute nodes can cause "No such file or directory" errors
+# Reference: https://spack.readthedocs.io/en/latest/config_yaml.html
 echo ""
-echo "Step 6: Building (this may take a while)"
+echo "Step 6: Configuring spack build staging"
+echo "=========================================="
+
+spack_config_dir="${MKL_ENV_DIR}/config/user"
+mkdir -p "${spack_config_dir}"
+
+cat > "${spack_config_dir}/config.yaml" << EOF
+config:
+  build_stage:
+    - ${SCRATCH}/spack-stage
+  source_cache: ${SCRATCH}/spack-cache
+EOF
+
+echo "Build stage set to: ${SCRATCH}/spack-stage"
+
+# Step 7: Build the environment
+echo ""
+echo "Step 7: Building (this may take a while)"
 echo "=========================================="
 
 uenv run "${UENV_IMAGE}" --view=spack -- "${MKL_ENV_DIR}/build"
