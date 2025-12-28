@@ -81,7 +81,9 @@ echo "problem,system,solver,parallel,threads,status,output_file" > "${SUMMARY_FI
 
 # Process each task from the task list
 while IFS='|' read -r problem_path system solver parallel threads; do
-  problem_name=$(basename "${problem_path}" .mps.bz2)
+  # Match benchmark_hipo.sh: remove only .bz2, keep .mps
+  problem_name=$(basename "${problem_path}")
+  problem_name="${problem_name%.bz2}"
   config_name="${system}-${solver}-par${parallel}-t${threads}"
   output_file="${config_name}_${problem_name}.out"
 

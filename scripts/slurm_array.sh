@@ -25,6 +25,9 @@
 #SBATCH --uenv=prgenv-gnu/25.11:v1
 #SBATCH --view=spack
 
+# Disable core dumps (can be 30-100GB each on crashes)
+ulimit -c 0
+
 # ============================================================================
 # Configuration
 # ============================================================================
