@@ -194,5 +194,12 @@ echo "=========================================="
 
 task_count=$(wc -l < "${TASK_LIST}")
 echo "Generated ${task_count} tasks: ${TASK_LIST}"
+
 echo ""
-echo "Next: sbatch --array=0-$((task_count - 1))%32 slurm_array.sh"
+echo "Phase 6: Decompressing Benchmark Files"
+echo "=========================================="
+
+"${HIGHS_DIR}/scripts/benchmark_hipo.sh" --decompress-all "${BENCHMARK_DIR}"
+
+echo ""
+echo "Next: sbatch --array=0-$((task_count - 1))%64 slurm_array.sh"

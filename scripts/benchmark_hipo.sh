@@ -32,6 +32,7 @@ show_usage() {
   echo "  --time-limit=SECS   Stop gracefully after SECS seconds"
   echo "  --generate-tasks=FILE  Generate task list file for SLURM array jobs"
   echo "  --task-list=FILE    Read tasks from file (for array jobs)"
+  echo "  --decompress-all    Decompress all .bz2 files (run in setup phase)"
   echo "  --help              Show this help message"
   echo ""
   echo "Array Job Mode:"
@@ -47,6 +48,7 @@ TIME_LIMIT=0
 BENCHMARK_DIR_ARG=""
 GENERATE_TASKS_FILE=""
 TASK_LIST_FILE=""
+DECOMPRESS_ALL=false
 
 # Parse each argument
 for arg in "$@"; do
@@ -68,6 +70,10 @@ for arg in "$@"; do
 
     --task-list=*)
       TASK_LIST_FILE="${arg#*=}"
+      ;;
+
+    --decompress-all)
+      DECOMPRESS_ALL=true
       ;;
 
     --help)
@@ -202,7 +208,10 @@ decompress_bz2() {
   name=$(basename "${compressed_file}" .bz2)
   local temp_file="${TEMP_DIR}/${name}"
 
-  bunzip2 -k -c "${compressed_file}" > "${temp_file}"
+  # Skip if already decompressed (by setup phase)
+  if [[ ! -f "${temp_file}" ]]; then
+    bunzip2 -k -c "${compressed_file}" > "${temp_file}"
+  fi
   echo "${temp_file}"
 }
 
@@ -357,9 +366,7 @@ run_single_problem() {
   echo "" >> "${output_file}"
   echo "End: $(date)" >> "${output_file}"
 
-  if [[ -n "${temp_file}" ]]; then
-    cleanup_temp_file "${temp_file}"
-  fi
+  # Don't cleanup - temp files are shared across parallel tasks
 }
 
 # Run all benchmark problems for a single configuration.
@@ -534,6 +541,30 @@ main() {
   echo "  Total configurations: ${num_configs}"
   echo "  Total runs: ${total_runs}"
   echo ""
+
+  # Decompress all mode: extract all .bz2 files and exit
+  if [[ "${DECOMPRESS_ALL}" == true ]]; then
+    echo "Decompressing all benchmark files..."
+    mkdir -p "${TEMP_DIR}"
+    local count=0
+    for problem_path in "${problems[@]}"; do
+      if is_bz2_compressed "${problem_path}"; then
+        local name
+        name=$(basename "${problem_path}" .bz2)
+        local temp_file="${TEMP_DIR}/${name}"
+        if [[ -f "${temp_file}" ]]; then
+          echo "  ${name} - already exists, skipping"
+        else
+          echo "  ${name} - decompressing..."
+          bunzip2 -k -c "${problem_path}" > "${temp_file}"
+          ((count++))
+        fi
+      fi
+    done
+    echo "Decompressed ${count} files to ${TEMP_DIR}"
+    du -sh "${TEMP_DIR}"
+    exit 0
+  fi
 
   # Task list generation mode: output tasks and exit
   if [[ -n "${GENERATE_TASKS_FILE}" ]]; then
