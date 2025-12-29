@@ -21,7 +21,7 @@
 #SBATCH --hint=nomultithread
 #SBATCH --output=bench_%A_%a.out
 #SBATCH --error=bench_%A_%a.err
-#SBATCH --array=0-527%32
+#SBATCH --array=0-527%64
 #SBATCH --uenv=prgenv-gnu/25.11:v1
 #SBATCH --view=spack
 
