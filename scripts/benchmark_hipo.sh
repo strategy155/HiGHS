@@ -333,15 +333,29 @@ run_single_problem() {
 
   export OMP_NUM_THREADS="${threads}"
 
+  # Write header before running (ensures output exists even if HiGHS crashes)
+  {
+    echo "=== HiPO Benchmark ==="
+    echo "Problem: ${problem_path}"
+    echo "Config: ${config_file}"
+    echo "Parallel: ${parallel}, Threads: ${threads}"
+    echo "Start: $(date)"
+    echo "======================"
+    echo ""
+  } > "${output_file}"
+
   if "${HIGHS_BIN}" --solver hipo \
       --parallel "${parallel}" \
       --model_file "${model_file}" \
       --options_file "${config_file}" \
-      > "${output_file}" 2>&1; then
+      >> "${output_file}" 2>&1; then
     echo "  Completed successfully"
   else
     echo "  Solver returned non-zero exit code"
   fi
+
+  echo "" >> "${output_file}"
+  echo "End: $(date)" >> "${output_file}"
 
   if [[ -n "${temp_file}" ]]; then
     cleanup_temp_file "${temp_file}"
