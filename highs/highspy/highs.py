@@ -40,6 +40,9 @@ class Highs(_Highs):
         super().__init__()
         self.callbacks = [HighsCallback(cb.HighsCallbackType(_), self) for _ in range(int(cb.HighsCallbackType.kCallbackMax) + 1)]
         self.enableCallbacks()
+        # Set HIPO with PARDISO as the default solver for Python bindings
+        super().setOptionValue("solver", "hipo")
+        super().setOptionValue("hipo_system_solver", "pardiso")
 
     # Silence logging
     def silent(self, turn_off_output: bool = True):
