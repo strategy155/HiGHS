@@ -162,7 +162,7 @@ else()
     find_library(METIS_LIB
         NAMES metis libmetis
         REQUIRED
-        PATHS "${METIS_ROOT}/lib" "${METIS_ROOT}/bin"
+        PATHS "${METIS_ROOT}/lib" "${METIS_ROOT}/lib/x86_64-linux-gnu" "${METIS_ROOT}/bin"
         NO_DEFAULT_PATH)
 
     if(METIS_LIB)

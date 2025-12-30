@@ -33,7 +33,7 @@ classifiers = [
 test = ["pytest", "numpy"]
 
 [tool.scikit-build]
-cmake.args = ["-DPYTHON_BUILD_SETUP=ON"]
+cmake.args = ["-DPYTHON_BUILD_SETUP=ON", "-DHIPO=ON", "-DFAST_BUILD=ON", "-DMETIS_ROOT=/usr", "-DMKL_DIR=/opt/intel/oneapi/mkl/2025.3/lib/cmake/mkl", "-DEigen3_DIR=/usr/share/eigen3/cmake"]
 wheel.expand-macos-universal-tags = true
 
 # A list of packages to auto-copy into the wheel. If this is not set, it will

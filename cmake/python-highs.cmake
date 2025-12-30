@@ -42,11 +42,33 @@ python_add_library(_core MODULE highs/highs_bindings.cpp WITH_SOABI)
 
 target_link_libraries(_core PRIVATE pybind11::headers)
 
-# sources for python 
+# sources for python
 target_sources(_core PUBLIC ${sources_python} ${headers_python})
 
-# include directories for python 
+# include directories for python
 target_include_directories(_core PUBLIC ${include_dirs_python})
+
+# HIPO support for Python bindings
+if(HIPO)
+  target_link_libraries(_core PRIVATE MKL::MKL Eigen3::Eigen)
+  target_include_directories(_core PRIVATE
+    ${PROJECT_SOURCE_DIR}/highs/hipo
+    ${PROJECT_SOURCE_DIR}/highs/hipo/auxiliary
+    ${PROJECT_SOURCE_DIR}/highs/hipo/factorhighs
+    ${PROJECT_SOURCE_DIR}/highs/hipo/ipm
+  )
+  if(metis_FOUND)
+    target_link_libraries(_core PRIVATE metis)
+  else()
+    target_include_directories(_core PRIVATE "${METIS_PATH}")
+    target_link_libraries(_core PRIVATE "${METIS_LIB}")
+  endif()
+  if(BLAS_LIB)
+    target_link_libraries(_core PRIVATE "${BLAS_LIB}")
+  elseif(OPENBLAS_LIB)
+    target_link_libraries(_core PRIVATE "${OPENBLAS_LIB}")
+  endif()
+endif()
 
 # This is passing in the version as a define just as an example
 target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
