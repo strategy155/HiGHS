@@ -31,9 +31,12 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest", "numpy"]
+hipo = []  # No Python deps; enables HIPO build via CMAKE_ARGS="-DHIPO=ON"
 
 [tool.scikit-build]
-cmake.args = ["-DPYTHON_BUILD_SETUP=ON", "-DHIPO=ON", "-DFAST_BUILD=ON", "-DMETIS_ROOT=/usr", "-DMKL_DIR=/opt/intel/oneapi/mkl/2025.3/lib/cmake/mkl", "-DEigen3_DIR=/usr/share/eigen3/cmake"]
+# Default: standard HiGHS build without HIPO
+# For HIPO: CMAKE_ARGS="-DHIPO=ON -DFAST_BUILD=ON" pip install highspy[hipo]
+cmake.args = ["-DPYTHON_BUILD_SETUP=ON"]
 wheel.expand-macos-universal-tags = true
 
 # A list of packages to auto-copy into the wheel. If this is not set, it will

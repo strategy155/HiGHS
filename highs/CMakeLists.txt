@@ -449,15 +449,37 @@ if(HIPO)
   set(MKL_INTERFACE lp64)
   set(EIGEN_USE_MKL_ALL)
 
-  find_package(MKL CONFIG REQUIRED)
-  find_package(Eigen3 REQUIRED)
+  # MKL must be pre-installed
+  find_package(MKL CONFIG QUIET)
+  if(NOT MKL_FOUND)
+    message(FATAL_ERROR
+      "Intel MKL not found. HIPO requires Intel MKL.\n"
+      "Install: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html\n"
+      "Setup: source /opt/intel/oneapi/setvars.sh\n"
+      "Or set MKL_DIR to your MKL cmake directory.")
+  endif()
+
+  # Eigen3: find system install first, fetch if not found
+  # Reference: https://cmake.org/cmake/help/latest/module/FetchContent.html
+  find_package(Eigen3 3.4 QUIET)
+  if(NOT Eigen3_FOUND)
+    message(STATUS "Eigen3 not found locally, fetching from GitLab...")
+    include(FetchContent)
+    FetchContent_Declare(
+      Eigen3
+      GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+      GIT_TAG        3147391d946bb4b6c68edd901f2add6ac1f31f8c  # 3.4.0
+      GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(Eigen3)
+  else()
+    message(STATUS "Found Eigen3: ${Eigen3_DIR}")
+  endif()
 
   if(FAST_BUILD)
-      target_link_libraries(highs PUBLIC MKL::MKL)
-      target_link_libraries(highs PUBLIC Eigen3::Eigen)
+    target_link_libraries(highs PUBLIC MKL::MKL Eigen3::Eigen)
   else()
-      target_link_libraries(libhighs PUBLIC MKL::MKL)
-      target_link_libraries(libhighs PUBLIC Eigen3::Eigen)
+    target_link_libraries(libhighs PUBLIC MKL::MKL Eigen3::Eigen)
   endif()
 endif()
 
