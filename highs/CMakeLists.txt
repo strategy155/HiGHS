@@ -230,9 +230,14 @@ else()
     endif()
 
     if(metis_FOUND)
+      # When using FetchContent, add METIS include path BEFORE system includes
+      # to avoid picking up incompatible system METIS headers (64-bit indices)
+      if(METIS_PATH)
+        target_include_directories(highs BEFORE PRIVATE "${METIS_PATH}")
+      endif()
       target_link_libraries(highs PRIVATE metis)
     else()
-      target_include_directories(highs PRIVATE "${METIS_PATH}")
+      target_include_directories(highs BEFORE PRIVATE "${METIS_PATH}")
       target_link_libraries(highs PRIVATE "${METIS_LIB}")
     endif()
 

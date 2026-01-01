@@ -137,49 +137,56 @@ else()
 endif()
 
 # METIS
-set(METIS_ROOT "" CACHE STRING "Root directory of METIS")
-message(STATUS "METIS_ROOT is " ${METIS_ROOT})
+set(METIS_ROOT "" CACHE STRING "Root directory of patched METIS")
+option(HIPO_FETCH_METIS "Fetch patched METIS if METIS_ROOT not set" ON)
 
-# If a METIS install was specified try to use it first.
-if (NOT (METIS_ROOT STREQUAL ""))
-    message(STATUS "Looking for METIS CMake targets file in " ${METIS_ROOT})
-    find_package(metis CONFIG NO_DEFAULT_PATH QUIET)
-else()
-    find_package(metis CONFIG QUIET)
-endif()
+# HIPO requires the patched METIS from galabovaa/METIS (32-bit indices).
+# System METIS typically uses 64-bit indices (idx_t = long) and is incompatible.
+# Do NOT use system METIS - always use METIS_ROOT or fetch the patched version.
 
-if(metis_FOUND)
-    message(STATUS "metis CMake config path: ${metis_DIR}")
-else()
-    find_path(METIS_PATH
-        NAMES "metis.h"
-        REQUIRED
-        PATHS "${METIS_ROOT}/include"
-        NO_DEFAULT_PATH)
+if(NOT (METIS_ROOT STREQUAL ""))
+    # User specified METIS_ROOT - use it
+    message(STATUS "Using METIS from METIS_ROOT: ${METIS_ROOT}")
+    find_package(metis CONFIG NO_DEFAULT_PATH QUIET PATHS "${METIS_ROOT}")
 
-    message(STATUS "Found Metis header at ${METIS_PATH}")
-
-    find_library(METIS_LIB
-        NAMES metis libmetis
-        REQUIRED
-        PATHS "${METIS_ROOT}/lib" "${METIS_ROOT}/lib/${CMAKE_LIBRARY_ARCHITECTURE}" "${METIS_ROOT}/bin"
-        NO_DEFAULT_PATH)
-
-    if(METIS_LIB)
-        message(STATUS "Found Metis library at ${METIS_LIB}")
+    if(metis_FOUND)
+        message(STATUS "Found METIS CMake config: ${metis_DIR}")
     else()
-        # METIS_ROOT was not successful
-        message(STATUS "Metis not found in METIS_PATH, fallback to default search.")
-        if (NOT (METIS_ROOT STREQUAL ""))
-            find_package(metis CONFIG)
+        # Try manual find
+        find_path(METIS_PATH NAMES "metis.h"
+            PATHS "${METIS_ROOT}/include" NO_DEFAULT_PATH)
+        find_library(METIS_LIB NAMES metis libmetis
+            PATHS "${METIS_ROOT}/lib" "${METIS_ROOT}/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+            NO_DEFAULT_PATH)
 
-            if (metis_FOUND)
-                message(STATUS "metis CMake config path: ${metis_DIR}")
-            else()
-                message(FATAL_ERROR "No Metis library found")
-            endif()
+        if(METIS_PATH AND METIS_LIB)
+            message(STATUS "Found METIS: ${METIS_PATH}, ${METIS_LIB}")
+        else()
+            message(FATAL_ERROR "METIS not found in METIS_ROOT=${METIS_ROOT}")
         endif()
     endif()
+elseif(HIPO_FETCH_METIS)
+    # Fetch patched METIS (includes GKlib)
+    message(STATUS "Fetching patched METIS from GitHub...")
+    include(FetchContent)
+    FetchContent_Declare(
+        metis
+        GIT_REPOSITORY https://github.com/galabovaa/METIS.git
+        GIT_TAG        510-ts
+        GIT_SHALLOW    TRUE
+    )
+    set(GKLIB_PATH "${FETCHCONTENT_BASE_DIR}/metis-src/GKlib" CACHE PATH "" FORCE)
+    FetchContent_MakeAvailable(metis)
+    set(metis_FOUND TRUE)
+    set(METIS_PATH "${FETCHCONTENT_BASE_DIR}/metis-src/include" CACHE PATH "" FORCE)
+    message(STATUS "Fetched METIS to: ${FETCHCONTENT_BASE_DIR}/metis-src")
+else()
+    message(FATAL_ERROR
+        "METIS not found. HIPO requires the patched METIS (32-bit indices).\n"
+        "Options:\n"
+        "  1. Set METIS_ROOT=/path/to/patched/metis\n"
+        "  2. Set HIPO_FETCH_METIS=ON (default) to auto-fetch\n"
+        "Patched METIS: https://github.com/galabovaa/METIS.git branch 510-ts")
 endif()
 
 # GKlib optional for newer versions on ubuntu and macos

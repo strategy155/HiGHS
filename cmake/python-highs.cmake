@@ -50,23 +50,35 @@ target_include_directories(_core PUBLIC ${include_dirs_python})
 
 # HIPO support for Python bindings
 if(HIPO)
-  target_link_libraries(_core PRIVATE MKL::MKL Eigen3::Eigen)
   target_include_directories(_core PRIVATE
     ${PROJECT_SOURCE_DIR}/highs/hipo
     ${PROJECT_SOURCE_DIR}/highs/hipo/auxiliary
     ${PROJECT_SOURCE_DIR}/highs/hipo/factorhighs
     ${PROJECT_SOURCE_DIR}/highs/hipo/ipm
   )
-  if(metis_FOUND)
-    target_link_libraries(_core PRIVATE metis)
-  else()
-    target_include_directories(_core PRIVATE "${METIS_PATH}")
-    target_link_libraries(_core PRIVATE "${METIS_LIB}")
-  endif()
+
+  # Link BLAS first (matching C++ build order in highs/CMakeLists.txt)
+  # MKL is linked after, ensuring Pardiso uses MKL's BLAS
   if(BLAS_LIB)
     target_link_libraries(_core PRIVATE "${BLAS_LIB}")
   elseif(OPENBLAS_LIB)
     target_link_libraries(_core PRIVATE "${OPENBLAS_LIB}")
+  endif()
+
+  # MKL and Eigen3 for Pardiso solver support
+  target_link_libraries(_core PRIVATE MKL::MKL Eigen3::Eigen)
+
+  # METIS
+  if(metis_FOUND)
+    # When using FetchContent, add METIS include path BEFORE system includes
+    # to avoid picking up incompatible system METIS headers (64-bit indices)
+    if(METIS_PATH)
+      target_include_directories(_core BEFORE PRIVATE "${METIS_PATH}")
+    endif()
+    target_link_libraries(_core PRIVATE metis)
+  else()
+    target_include_directories(_core BEFORE PRIVATE "${METIS_PATH}")
+    target_link_libraries(_core PRIVATE "${METIS_LIB}")
   endif()
 endif()
 
