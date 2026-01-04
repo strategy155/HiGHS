@@ -42,9 +42,8 @@ CONFIG_COLUMNS = [
     parse_results.FIELD_THREADS,
 ]
 
-# Comparison group columns (without solver - used for HiGHS vs PARDISO comparisons)
+# Comparison group columns (parallel × threads - each group shows all solver×system combos)
 COMPARISON_GROUP_COLUMNS = [
-    parse_results.FIELD_SYSTEM,
     parse_results.FIELD_IS_PARALLEL,
     parse_results.FIELD_THREADS,
 ]
@@ -52,6 +51,9 @@ COMPARISON_GROUP_COLUMNS = [
 # Solver names for .dat file column headers
 SOLVER_HIGHS = "highs"
 SOLVER_PARDISO = "pardiso"
+
+# Composite column for pivot ({solver}_{system})
+SOLVER_SYSTEM_COLUMN = "solver_system"
 
 # pgfplots .dat file column names
 DAT_COLUMN_TAU = "tau"
@@ -83,23 +85,22 @@ def build_config_name(system: str, solver: str, is_parallel: bool, threads: int)
     return name
 
 
-def build_comparison_group_name(system: str, is_parallel: bool, threads: int) -> str:
-    """Build a comparison group name (without solver).
+def build_comparison_group_name(is_parallel: bool, threads: int) -> str:
+    """Build a comparison group name (parallel × threads).
 
-    Used for naming .dat files that compare HiGHS vs PARDISO.
+    Used for naming .dat files that show all solver×system combinations.
 
     Args:
-        system: Linear system formulation (normaleq, augmented).
         is_parallel: Whether parallel mode is enabled.
         threads: Number of threads.
 
     Returns:
-        Group name like 'augmented-paron-t256'.
+        Group name like 'paron-t256'.
     """
     parallel_str = parse_results.PARALLEL_ON if is_parallel else parse_results.PARALLEL_OFF
     threads_str = f"{parse_results.THREADS_PREFIX}{threads}"
 
-    parts = [system, parallel_str, threads_str]
+    parts = [parallel_str, threads_str]
     name = parse_results.CONFIG_SEPARATOR.join(parts)
 
     return name
@@ -311,8 +312,8 @@ def export_profiles_to_dat(
 ) -> None:
     """Export performance profiles to .dat files for pgfplots.
 
-    Uses partition_by to split by comparison group (system, parallel, threads),
-    then pivots to get solvers as columns.
+    Groups by (parallel, threads) and pivots on {solver}_{system}.
+    Each file contains 4 curves: highs_augmented, highs_normaleq, etc.
 
     Args:
         all_profiles: DataFrame with columns [system, solver, is_parallel, threads, tau, fraction].
@@ -320,24 +321,31 @@ def export_profiles_to_dat(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Partition by comparison group (without solver)
-    partitions = all_profiles.partition_by(COMPARISON_GROUP_COLUMNS, as_dict=True)
+    # Create composite column: "highs_augmented", "pardiso_normaleq", etc.
+    solver_col = pl.col(parse_results.FIELD_SOLVER)
+    system_col = pl.col(parse_results.FIELD_SYSTEM)
+    composite_format = pl.format("{}_{}", solver_col, system_col)
+    solver_system_expr = composite_format.alias(SOLVER_SYSTEM_COLUMN)
+
+    df_with_composite = all_profiles.with_columns(solver_system_expr)
+
+    # Partition by (parallel, threads)
+    partitions = df_with_composite.partition_by(COMPARISON_GROUP_COLUMNS, as_dict=True)
 
     for group_key, group_df in partitions.items():
-        # group_key is tuple: (system, is_parallel, threads)
-        system, is_parallel, threads = group_key
+        is_parallel, threads = group_key
 
-        group_name = build_comparison_group_name(system, is_parallel, threads)
+        group_name = build_comparison_group_name(is_parallel, threads)
         output_file = output_dir / f"{group_name}.dat"
 
-        # Pivot: rows=tau, columns=solver, values=fraction
+        # Pivot: rows=tau, columns=solver_system, values=fraction
         pivoted = group_df.pivot(
-            on=parse_results.FIELD_SOLVER,
+            on=SOLVER_SYSTEM_COLUMN,
             index=DAT_COLUMN_TAU,
             values=FRACTION_COLUMN,
         )
 
-        # Write tab-separated .dat file (no dedicated write_tsv in Polars)
+        # Write tab-separated .dat file
         pivoted.write_csv(output_file, separator=TSV_SEPARATOR)
 
         print(f"Wrote {output_file}")
