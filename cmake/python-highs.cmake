@@ -50,6 +50,19 @@ target_include_directories(_core PUBLIC ${include_dirs_python})
 
 # HIPO support for Python bindings
 if(HIPO)
+  # Validate required targets exist (should be found in root CMakeLists.txt)
+  if(NOT TARGET MKL::MKL)
+    message(FATAL_ERROR
+      "MKL::MKL target not found. HIPO requires Intel MKL.\n"
+      "Ensure MKL is found before including python-highs.cmake.\n"
+      "Setup: source /opt/intel/oneapi/setvars.sh")
+  endif()
+  if(NOT TARGET Eigen3::Eigen)
+    message(FATAL_ERROR
+      "Eigen3::Eigen target not found. HIPO requires Eigen3.\n"
+      "Ensure Eigen3 is found before including python-highs.cmake.")
+  endif()
+
   target_include_directories(_core PRIVATE
     ${PROJECT_SOURCE_DIR}/highs/hipo
     ${PROJECT_SOURCE_DIR}/highs/hipo/auxiliary

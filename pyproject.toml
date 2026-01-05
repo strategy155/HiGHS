@@ -35,7 +35,8 @@ hipo = []  # No Python deps; enables HIPO build via CMAKE_ARGS="-DHIPO=ON"
 
 [tool.scikit-build]
 # Default: standard HiGHS build without HIPO
-# For HIPO: CMAKE_ARGS="-DHIPO=ON -DFAST_BUILD=ON" pip install highspy[hipo]
+# For HIPO: CMAKE_ARGS="-DHIPO=ON" pip install highspy[hipo]
+# Requires: Intel MKL (source /opt/intel/oneapi/setvars.sh)
 cmake.args = ["-DPYTHON_BUILD_SETUP=ON"]
 wheel.expand-macos-universal-tags = true
 
