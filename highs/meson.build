@@ -14,6 +14,7 @@ conf_data.set('ZLIB_FOUND',
 # failure?
 conf_data.set('CUPDLP_CPU', true)
             #  cupdlp_cpu.found())
+conf_data.set('HIPO', get_option('with_hipo'))
 # 64 bit numbers
 if host_machine.cpu_family() == 'x86_64'
     # Get user's option, if it's not provided, enable highsint64 by default on x86_64
@@ -311,6 +312,55 @@ highslib_srcs = [
   files(_ipx_srcs),
 ]
 
+# HiPO sources (conditionally included when with_hipo=true)
+if get_option('with_hipo')
+  _hipo_srcs = [
+    # auxiliary/
+    'ipm/hipo/auxiliary/Auxiliary.cpp',
+    'ipm/hipo/auxiliary/KrylovMethods.cpp',
+    'ipm/hipo/auxiliary/Log.cpp',
+    'ipm/hipo/auxiliary/VectorOperations.cpp',
+    # factorhighs/
+    'ipm/hipo/factorhighs/Analyse.cpp',
+    'ipm/hipo/factorhighs/CallAndTimeBlas.cpp',
+    'ipm/hipo/factorhighs/DataCollector.cpp',
+    'ipm/hipo/factorhighs/DenseFactHybrid.cpp',
+    'ipm/hipo/factorhighs/DenseFactKernel.cpp',
+    'ipm/hipo/factorhighs/DgemmParallel.cpp',
+    'ipm/hipo/factorhighs/FactorHiGHS.cpp',
+    'ipm/hipo/factorhighs/Factorise.cpp',
+    'ipm/hipo/factorhighs/FormatHandler.cpp',
+    'ipm/hipo/factorhighs/HybridHybridFormatHandler.cpp',
+    'ipm/hipo/factorhighs/HybridSolveHandler.cpp',
+    'ipm/hipo/factorhighs/KrylovMethodsIpm.cpp',
+    'ipm/hipo/factorhighs/Numeric.cpp',
+    'ipm/hipo/factorhighs/SolveHandler.cpp',
+    'ipm/hipo/factorhighs/Swaps.cpp',
+    'ipm/hipo/factorhighs/SymScaling.cpp',
+    'ipm/hipo/factorhighs/Symbolic.cpp',
+    # ipm/
+    'ipm/hipo/ipm/Control.cpp',
+    'ipm/hipo/ipm/CurtisReidScaling.cpp',
+    'ipm/hipo/ipm/FactorHiGHSSolver.cpp',
+    'ipm/hipo/ipm/IpmData.cpp',
+    'ipm/hipo/ipm/Iterate.cpp',
+    'ipm/hipo/ipm/LogHighs.cpp',
+    'ipm/hipo/ipm/Model.cpp',
+    'ipm/hipo/ipm/Solver.cpp',
+    # pardiso_wrapper/
+    'ipm/hipo/pardiso_wrapper/PardisoSolver.cpp',
+  ]
+  highslib_srcs += files(_hipo_srcs)
+
+  # HiPO include directories
+  _incdirs += include_directories([
+    'ipm/hipo/',
+    'ipm/hipo/auxiliary/',
+    'ipm/hipo/factorhighs/',
+    'ipm/hipo/ipm/',
+    'ipm/hipo/pardiso_wrapper/',
+  ])
+endif
 
 symbol_visibility = 'default'
 if get_option('default_library') == 'static'

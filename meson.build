@@ -159,6 +159,34 @@ if zlib_dep.found()
   _incdirs += include_directories(['extern/zstr'])
 endif
 
+# HiPO dependencies (MKL for PARDISO, and METIS)
+hipo_enabled = get_option('with_hipo')
+
+if hipo_enabled
+  # MKL detection for PARDISO - use scipy's pattern
+  mkl_dep = dependency('mkl',
+    modules: ['interface: lp64', 'threading: iomp'],
+    required: false,
+  )
+  if not mkl_dep.found()
+    # Try SDL (single dynamic library) fallback
+    mkl_dep = dependency('mkl', modules: ['sdl: true'], required: false)
+  endif
+  if not mkl_dep.found()
+    error('HiPO requires Intel MKL for PARDISO. Install MKL or set with_hipo=false.')
+  endif
+  _deps += mkl_dep
+
+  # METIS - use cmake subproject (patched 32-bit version from galabovaa/METIS)
+  cmake = import('cmake')
+  metis_opts = cmake.subproject_options()
+  metis_opts.add_cmake_defines({'GKLIB_PATH': meson.current_source_dir() / 'subprojects/metis/GKlib'})
+  metis_proj = cmake.subproject('metis', options: metis_opts, required: true)
+  metis_dep = metis_proj.dependency('metis')
+  _deps += metis_dep
+  _incdirs += include_directories('subprojects/metis/include')
+endif
+
 # Include Sources
 _incdirs += include_directories([
   'extern/',

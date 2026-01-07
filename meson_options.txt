@@ -29,3 +29,7 @@ option('with_pybind11',
 option('do_install',
        type : 'boolean',
        value : true)
+option('with_hipo',
+       type : 'boolean',
+       value : false,
+       description : 'Build HiPO solver (requires BLAS and METIS)')
