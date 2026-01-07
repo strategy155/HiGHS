@@ -163,11 +163,17 @@ endif
 hipo_enabled = get_option('with_hipo')
 
 if hipo_enabled
-  # MKL detection for PARDISO - use scipy's pattern
+  # MKL detection for PARDISO - try multiple threading options
   mkl_dep = dependency('mkl',
-    modules: ['interface: lp64', 'threading: iomp'],
+    modules: ['interface: lp64', 'threading: gomp'],
     required: false,
   )
+  if not mkl_dep.found()
+    mkl_dep = dependency('mkl',
+      modules: ['interface: lp64', 'threading: iomp'],
+      required: false,
+    )
+  endif
   if not mkl_dep.found()
     # Try SDL (single dynamic library) fallback
     mkl_dep = dependency('mkl', modules: ['sdl: true'], required: false)
