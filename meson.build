@@ -163,34 +163,37 @@ endif
 hipo_enabled = get_option('with_hipo')
 
 if hipo_enabled
-  # MKL detection for PARDISO - try multiple threading options
-  mkl_dep = dependency('mkl',
-    modules: ['interface: lp64', 'threading: gomp'],
-    required: false,
-  )
+  # MKL detection for PARDISO using direct pkg-config file names
+  # Note: dependency('mkl', modules: [...]) is NOT a standard meson feature (see meson#2835)
+  # Intel MKL provides specific .pc files, not a master 'mkl.pc'
+  mkl_dep = dependency('', required: false)  # Initialize as not found
+  foreach mkl_name : ['mkl-dynamic-lp64-gomp', 'mkl-dynamic-lp64-iomp', 'mkl-dynamic-lp64-seq', 'mkl-sdl']
+    mkl_dep = dependency(mkl_name, required: false)
+    if mkl_dep.found()
+      message('Found MKL via pkg-config: ' + mkl_name)
+      break
+    endif
+  endforeach
   if not mkl_dep.found()
-    mkl_dep = dependency('mkl',
-      modules: ['interface: lp64', 'threading: iomp'],
-      required: false,
-    )
-  endif
-  if not mkl_dep.found()
-    # Try SDL (single dynamic library) fallback
-    mkl_dep = dependency('mkl', modules: ['sdl: true'], required: false)
-  endif
-  if not mkl_dep.found()
-    error('HiPO requires Intel MKL for PARDISO. Install MKL or set with_hipo=false.')
+    error('HiPO requires Intel MKL for PARDISO. Ensure MKL pkg-config files are in PKG_CONFIG_PATH.')
   endif
   _deps += mkl_dep
 
+  # Eigen - required for HiPO sparse matrix operations
+  eigen_dep = dependency('eigen3', required: true)
+  _deps += eigen_dep
+
   # METIS - use cmake subproject (patched 32-bit version from galabovaa/METIS)
+  # Note: meson clones wrap subprojects to the global source root, not the current subproject
   cmake = import('cmake')
   metis_opts = cmake.subproject_options()
-  metis_opts.add_cmake_defines({'GKLIB_PATH': meson.current_source_dir() / 'subprojects/metis/GKlib'})
+  # Use global_source_root() to get the scipy root, where meson puts all subprojects
+  metis_source_dir = meson.global_source_root() / 'subprojects/metis'
+  metis_opts.add_cmake_defines({'GKLIB_PATH': metis_source_dir / 'GKlib'})
   metis_proj = cmake.subproject('metis', options: metis_opts, required: true)
   metis_dep = metis_proj.dependency('metis')
   _deps += metis_dep
-  _incdirs += include_directories('subprojects/metis/include')
+  # The metis dependency includes the necessary include paths
 endif
 
 # Include Sources
