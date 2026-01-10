@@ -86,7 +86,15 @@ if (FORTRAN OR CSHARP)
   set(BUILD_SHARED_LIBS ON)
 endif()
 
-option(PYTHON_BUILD_SETUP "Build Python interface from setup.py" OFF)
+# Auto-detect scikit-build-core: SKBUILD is set as a CMake variable when
+# building via pip/uv. This ensures Python bindings are built even when
+# users override cmake.args via SKBUILD_CMAKE_ARGS.
+# See: https://scikit-build-core.readthedocs.io/en/latest/configuration.html
+if(SKBUILD)
+  option(PYTHON_BUILD_SETUP "Build Python interface" ON)
+else()
+  option(PYTHON_BUILD_SETUP "Build Python interface from setup.py" OFF)
+endif()
 message(STATUS "Build Python: ${PYTHON_BUILD_SETUP}")
 if (PYTHON_BUILD_SETUP)
   set(BUILD_CXX OFF)
